@@ -49,8 +49,9 @@ _TON_TOLERANCE: float = 0.05
 _BOILER_EFFICIENCY_DEFAULT: float = 0.85
 _COP_DEFAULT: float = 2.5
 
-# The tool name used to force a strict-JSON response.
-_MEMO_TOOL_NAME: str = "board_memo"
+# The tool name the model must call to return the strict-JSON memo. It must
+# match the name referenced in the system prompt ("write_memo").
+_MEMO_TOOL_NAME: str = "write_memo"
 
 # System prompt per CLAUDE_MEMO_PROMPT.md: plain English, only the given
 # numbers, never "in violation"/"will be fined", no legal/financial advice.
@@ -64,7 +65,8 @@ _SYSTEM_PROMPT: str = (
     'figure an "estimated Alternative Compliance Payment." Never say the '
     "building is in violation or will be fined, and never give legal or "
     "financial advice. End by recommending the board confirm details with the "
-    "City's BERDO team."
+    "City's BERDO team. "
+    "Always respond by calling the write_memo tool exactly once."
 )
 
 # JSON schema forcing exactly the five MEMO_FIELDS via tool use (R5.2).
@@ -107,6 +109,20 @@ class MemoError(Exception):
     """
 
 
+def _round_tons(value: Any) -> Any:
+    """Round a tonnage to 1 decimal for the Claude payload; pass None through."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return round(float(value), 1)
+    return value
+
+
+def _round_dollars(value: Any) -> Any:
+    """Round a dollar amount to whole dollars for the Claude payload."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(round(float(value)))
+    return value
+
+
 def build_memo_payload(
     building: Any, exposure: dict, scenario: dict
 ) -> dict:
@@ -125,12 +141,15 @@ def build_memo_payload(
 
     Satisfies: R5.1.
     """
+    # Round the numbers the memo is built from: tons and limits to 1 decimal,
+    # dollars to whole dollars. The calculator keeps full precision; only the
+    # values shown to Claude (and therefore to the reader) are rounded.
     exposure_by_period = [
         {
             "period": period,
-            "limit_tons": values.get("limit_tons"),
-            "excess_tons": values.get("excess_tons"),
-            "acp_usd_per_year": values.get("acp_usd"),
+            "limit_tons": _round_tons(values.get("limit_tons")),
+            "excess_tons": _round_tons(values.get("excess_tons")),
+            "acp_usd_per_year": _round_dollars(values.get("acp_usd")),
         }
         for period, values in exposure.get("by_period", {}).items()
     ]
@@ -143,15 +162,17 @@ def build_memo_payload(
             "first_compliance_year": getattr(building, "first_compliance_year", None),
         },
         "today": {
-            "emissions_tons": exposure.get("emissions_tons"),
+            "emissions_tons": _round_tons(exposure.get("emissions_tons")),
             "city_status": getattr(building, "compliance_status", None),
         },
         "exposure_by_period": exposure_by_period,
         "scenario": {
             "heat_pump_fraction": scenario.get("heat_pump_fraction"),
             "efficiency_pct": scenario.get("efficiency_pct"),
-            "new_emissions_tons": scenario.get("new_emissions_tons"),
-            "new_acp_2030_usd_per_year": scenario.get("new_acp_2030_usd_per_year"),
+            "new_emissions_tons": _round_tons(scenario.get("new_emissions_tons")),
+            "new_acp_2030_usd_per_year": _round_dollars(
+                scenario.get("new_acp_2030_usd_per_year")
+            ),
         },
         "assumptions": scenario.get(
             "assumptions",
@@ -174,10 +195,12 @@ def call_claude(
 ) -> dict:
     """Call the Claude API via tool use and return the parsed five-field memo.
 
-    Forces a strict-JSON response containing exactly the five ``MEMO_FIELDS``
-    by exposing a single tool whose ``input_schema`` requires those fields and
-    setting ``tool_choice`` to that tool. Applies a ``timeout``-second limit
-    (default 20 s). The API key is never passed to any logging call.
+    Exposes a single ``write_memo`` tool whose ``input_schema`` requires the
+    five fields and sets ``tool_choice={"type": "auto"}`` (some models reject
+    the "tool"/"any" forcing modes); the system prompt instructs the model to
+    call ``write_memo`` exactly once. The memo is read from the ``tool_use``
+    block, falling back to JSON in the text block. Applies a ``timeout``-second
+    limit (default 20 s). The API key is never passed to any logging call.
 
     Raises ``MemoError`` on API failure, timeout, a non-JSON response, JSON
     missing any required field, or a rate-limiting error.
@@ -204,7 +227,9 @@ def call_claude(
                     "input_schema": _MEMO_TOOL_SCHEMA,
                 }
             ],
-            tool_choice={"type": "tool", "name": _MEMO_TOOL_NAME},
+            # "auto" lets the model choose; the system prompt instructs it to
+            # call write_memo exactly once. Some models reject "tool"/"any".
+            tool_choice={"type": "auto"},
             messages=[
                 {
                     "role": "user",
@@ -224,11 +249,19 @@ def call_claude(
         logger.warning("Claude memo call timed out; using templated fallback.")
         raise MemoError("Claude API timed out") from exc
     except anthropic.APIError as exc:
+        # Keep the original exception type and message so the fallback reason is
+        # actionable (e.g. a 400 about tool_choice). The anthropic error message
+        # does not contain the API key, and this goes into the MemoError text,
+        # not a logging call (R5.11).
         logger.warning("Claude memo call failed; using templated fallback.")
-        raise MemoError("Claude API call failed") from exc
+        raise MemoError(
+            f"Claude API call failed: {type(exc).__name__}: {exc}"
+        ) from exc
     except Exception as exc:  # noqa: BLE001 - any client failure -> fallback
         logger.warning("Unexpected error during Claude memo call; using fallback.")
-        raise MemoError("Unexpected Claude API error") from exc
+        raise MemoError(
+            f"Unexpected Claude API error: {type(exc).__name__}: {exc}"
+        ) from exc
 
     memo = _extract_tool_input(response)
     _require_fields(memo)
@@ -236,10 +269,13 @@ def call_claude(
 
 
 def _extract_tool_input(response: Any) -> dict:
-    """Pull the tool-use JSON input from a Claude response.
+    """Pull the memo JSON from a Claude response.
 
-    Raises ``MemoError`` if no tool-use block is present or its input does not
-    parse as a JSON object.
+    Prefers the ``tool_use`` block's ``input`` (a dict, or a JSON string the SDK
+    occasionally returns). When there is no ``tool_use`` block - which can happen
+    under ``tool_choice={"type": "auto"}`` if the model answers in prose - fall
+    back to ``json.loads`` on the first text block. Raises ``MemoError`` if
+    neither yields a JSON object.
     """
     content = getattr(response, "content", None)
     if not content:
@@ -258,7 +294,26 @@ def _extract_tool_input(response: Any) -> dict:
                 raise MemoError("Claude tool input was not a JSON object")
             return tool_input
 
-    raise MemoError("Claude response contained no tool_use block")
+    # No tool_use block: try to parse the first text block as JSON.
+    for block in content:
+        if getattr(block, "type", None) == "text":
+            text = getattr(block, "text", None)
+            if not isinstance(text, str):
+                continue
+            try:
+                parsed = json.loads(text)
+            except (ValueError, TypeError) as exc:
+                raise MemoError(
+                    "Claude response had no tool_use block and the text block "
+                    "was not valid JSON"
+                ) from exc
+            if not isinstance(parsed, dict):
+                raise MemoError(
+                    "Claude text block did not contain a JSON object"
+                )
+            return parsed
+
+    raise MemoError("Claude response contained no tool_use or text block")
 
 
 def _require_fields(memo: dict) -> None:
@@ -437,8 +492,10 @@ def templated_memo(payload: dict) -> dict:
     tradeoffs = [
         "These figures are an estimate, not a compliance determination.",
         "Retrofit work has upfront cost and can disrupt building operations.",
-        "Portfolio and campus compliance, flexibility measures, and a cleaner "
-        "electric grid can lower real exposure below this estimate.",
+        "Portfolio and campus compliance and flexibility measures can lower "
+        "real exposure below this estimate; "
+        "the City projects grid emissions roughly flat through 2034; "
+        "later periods may be lower.",
     ]
 
     next_steps = [
@@ -493,15 +550,28 @@ def generate_memo(
     Satisfies: R5.3, R5.5, R5.8, R5.9.
     """
     if not model or not api_key:
+        logger.info("Claude memo skipped (model or API key not configured); "
+                    "using templated memo.")
         return templated_memo(payload)
 
     try:
         memo = call_claude(payload, model, api_key)
-    except MemoError:
+    except MemoError as exc:
+        # Print the fallback reason to the terminal: the exception type and its
+        # message. call_claude raises MemoError with a static, key-free message,
+        # so this never logs the API key (R5.11).
+        logger.warning(
+            "Claude memo failed, using templated memo: %s: %s",
+            type(exc).__name__,
+            exc,
+        )
         return templated_memo(payload)
 
     allowed = _allowed_values_from_payload(payload)
     if not validate_memo_numbers(memo, allowed):
+        logger.warning(
+            "Claude memo failed number validation; using templated memo."
+        )
         return templated_memo(payload)
 
     return memo

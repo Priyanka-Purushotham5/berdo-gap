@@ -95,6 +95,30 @@ def _coerce_berdo_id(value: object) -> str:
     return str(value).strip()
 
 
+def _coerce_zip(value: object) -> str:
+    """Return a ZIP as a 5-char zero-padded string ("02134"), or "" when blank.
+
+    Boston ZIPs lose their leading zero when the disclosure stores them as
+    numbers (2134.0). This renders them without float artifacts and left-pads
+    purely numeric ZIPs to five digits so the City view groups by one string.
+    """
+    if isinstance(value, float):
+        if pd.isna(value):
+            return ""
+        text = str(int(value)) if value.is_integer() else str(value)
+    elif isinstance(value, int):
+        text = str(value)
+    else:
+        if value is None:
+            return ""
+        text = str(value).strip()
+    if not text or text.lower() == "nan":
+        return ""
+    if text.isdigit():
+        return text.zfill(5)
+    return text
+
+
 class LoadError(Exception):
     """Raised when the disclosure cannot be loaded.
 
@@ -136,6 +160,11 @@ def normalize_columns(raw: pd.DataFrame) -> pd.DataFrame:
     # as floats (e.g. 100005.0) are rendered without the ".0" artifact; genuine
     # campus strings like "C10002" are preserved verbatim.
     df[COL_BERDO_ID] = df[COL_BERDO_ID].map(_coerce_berdo_id).astype(str)
+
+    # Normalize ZIP codes to 5-char zero-padded strings (no float artifacts) so
+    # the City view groups by a single consistent string per ZIP.
+    for zip_col in (COL_ZIP, COL_PARCEL_ZIP):
+        df[zip_col] = df[zip_col].map(_coerce_zip).astype(str)
 
     # Coerce fuel/emission fields: blanks and non-numeric cells become 0 (R1.12).
     for col in _NUMERIC_ZERO_COLUMNS:

@@ -53,14 +53,20 @@ def apply_heat_pump(
     Returns
     ``emissions_kg - f * gas_emissions_kg + added_kwh(...) * elec_factor``.
 
-    When ``gas_kbtu`` is 0 the building has no gas heat to convert, so emissions
-    are returned unchanged for any f (both the reduction and the addition rest
-    on gas usage / gas emissions being present). When ``elec_factor`` is 0 the
-    added electricity carries no emissions, so emissions never increase. The
-    result is clamped at 0 so emissions are never negative.
-    Satisfies: R4.2, R4.3, R4.4, R4.5, R4.6, R9.7 (P7).
+    When there is no gas to convert, emissions are returned unchanged for any
+    f. "No gas to convert" means both no gas emissions to remove AND no gas
+    energy to shift onto electricity; keying the guard only off ``gas_kbtu``
+    was unsafe, because efficiency scaling upstream can underflow a tiny
+    ``gas_kbtu`` to exactly 0 while ``gas_emissions_kg`` is still positive, which
+    would wrongly skip the gas-emissions reduction and let more efficiency yield
+    higher emissions (violating P6). When ``gas_kbtu`` is 0 the added-kWh term
+    is 0, so the general formula already leaves that case correct. When
+    ``elec_factor`` is 0 the added electricity carries no emissions, so
+    emissions never increase. The result is clamped at 0 so emissions are never
+    negative.
+    Satisfies: R4.2, R4.3, R4.4, R4.5, R4.6, R9.6 (P6), R9.7 (P7).
     """
-    if gas_kbtu == 0:
+    if gas_kbtu == 0 and gas_emissions_kg == 0:
         return emissions_kg
     added = added_kwh(gas_kbtu, f, boiler_eff, cop) * elec_factor
     new_emissions = emissions_kg - f * gas_emissions_kg + added
