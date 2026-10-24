@@ -1,0 +1,5 @@
+berdo_id,address,berdo_use,gross_floor_area_sqft,total_ghg_kgco2e,natural_gas_kbtu,natural_gas_kgco2e,electricity_kwh,electricity_kgco2e,city_applicable_standard_2025,first_compliance_year,city_emissions_compliance_status
+100064,185 Dudley St,Office,20152,71669.7,1016000,53959.8,122554,17710,,2030,N/A until 2030
+100018,1047 Commonwealth Ave,Multifamily Housing,100800,428949.8,5140191.2,272995.6,1051673,155954.3,4.1,2025,Action Needed
+100045,1455-1459 Tremont St,Multifamily Housing,38971,52534.3,462237,24549.4,187614,27984.9,4.1,2025,In Compliance
+100005,24 School St,Office,134789,455284.8,0,0,1063201.9,192969.1,5.3,2025,In Compliance

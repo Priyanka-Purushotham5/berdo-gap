@@ -1,0 +1,67 @@
+portfolio_manager_type,berdo_use,basis,city_records_supporting
+Adult Education,Education,derived,1
+Bank Branch,Retail,derived,1
+College/University,College / University,derived,31
+Convention Center,Assembly,derived,1
+Courthouse,Services,derived,6
+Data Center,Technology / Science,derived,4
+Distribution Center,Storage,derived,8
+Fast Food Restaurant,Food Sales and Service,derived,1
+Financial Office,Office,derived,7
+Fitness Center/Health Club/Gym,Assembly,derived,2
+Food Sales,Food Sales and Service,derived,1
+Food Service,Food Sales and Service,derived,1
+Hospital (General Medical & Surgical),Healthcare,derived,4
+Hotel,Lodging,derived,54
+Ice/Curling Rink,Assembly,derived,3
+Indoor Arena,Assembly,derived,1
+K-12 School,Education,derived,16
+Laboratory,Technology / Science,derived,29
+Library,Services,derived,1
+Manufacturing/Industrial Plant,Manufacturing / Industrial,derived,24
+Medical Office,Healthcare,derived,8
+Movie Theater,Assembly,derived,1
+Multifamily Housing,Multifamily Housing,derived,648
+Museum,Assembly,derived,4
+Non-Refrigerated Warehouse,Storage,derived,15
+Office,Office,derived,269
+Other - Education,Education,derived,4
+Other - Entertainment/Public Assembly,Assembly,derived,3
+Other - Lodging/Residential,Lodging,derived,3
+Other - Mall,Retail,derived,1
+Other - Public Services,Services,derived,1
+Other - Recreation,Assembly,derived,2
+Other - Services,Services,derived,1
+Other - Technology/Science,Technology / Science,derived,1
+Other - Utility,Services,derived,2
+Other,Manufacturing / Industrial,derived (low confidence),2
+Other/Specialty Hospital,Healthcare,derived,3
+Parking,Storage,derived,5
+Performing Arts,Assembly,derived,7
+Prison/Incarceration,Lodging,derived,3
+Race Track,Assembly,derived,1
+Refrigerated Warehouse,Storage,derived,2
+Residence Hall/Dormitory,Lodging,derived,5
+Residential Care Facility,Healthcare,derived,1
+Retail Store,Retail,derived,17
+Self-Storage Facility,Storage,derived,14
+Senior Living Community,Healthcare,derived,10
+Social/Meeting Hall,Assembly,derived,1
+Stadium (Open),Assembly,derived,1
+Strip Mall,Retail,derived,10
+Supermarket/Grocery Store,Food Sales and Service,derived,19
+Transportation Terminal/Station,Services,derived,1
+Urgent Care/Clinic/Other Outpatient,Healthcare,derived,3
+Vehicle Dealership,Retail,derived,4
+Vocational School,Education,derived,2
+Wastewater Treatment Plant,Services,derived,1
+Worship Facility,Assembly,derived,18
+Enclosed Mall,Retail,assumed,0
+Vehicle Repair Services,Services,assumed,0
+Other - Restaurant/Bar,Food Sales and Service,assumed,0
+Wholesale Club/Supercenter,Retail,assumed,0
+Convenience Store without Gas Station,Food Sales and Service,assumed,0
+Restaurant,Food Sales and Service,assumed,0
+Bar/Nightclub,Food Sales and Service,assumed,0
+Pre-school/Daycare,Education,assumed,0
+Single Family Home,Multifamily Housing,assumed (low confidence),0

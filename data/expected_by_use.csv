@@ -1,0 +1,15 @@
+berdo_use,buildings,over_2025_2029,expected_acp_2025_2029_total,over_2030_2034,expected_acp_2030_2034_total
+"Assembly",75,2,7395.10,19,769744.06
+"College / University",27,0,0.00,7,333445.06
+"Education",23,0,0.00,15,317064.84
+"Food Sales and Service",33,1,8063.34,14,411347.40
+"Healthcare",30,0,0.00,4,869163.64
+"Lodging",59,7,503965.09,39,2744976.99
+"Manufacturing / Industrial",28,0,0.00,2,104430.36
+"Multifamily Housing",1065,45,461437.63,700,9909788.25
+"Office",300,6,146433.63,103,5068417.48
+"Retail",50,0,0.00,30,1174921.89
+"Services",29,1,1679594.08,11,3833852.02
+"Storage",58,1,73537.78,14,415820.02
+"Technology / Science",32,0,0.00,5,1453485.42
+"ALL",1809,63,2880426.65,963,27406457.43
